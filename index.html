@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
   <head>
-    <!-- Etiquetas META -->
+    <!-- Aquí defino las etiquetas meta esenciales que nos pidió el profesor para el manejo de caracteres y diseño responsivo -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Juego de Tres en Raya interactivo utilizando modelos de TensorFlow.js basados en el método del libro." />
@@ -10,10 +10,11 @@
 
     <title>Tic-Tac-Toe con TensorFlow.js (Pink Edition)</title>
     
-    <!-- Script original de la clase -->
+    <!-- Cargo la librería de TensorFlow.js mediante el CDN oficial indicado en la clase del Chapter 5 -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.0.0/dist/tf.min.js"></script>
     
     <style>
+      /* Aquí personalicé todo el estilo visual con una estética rosita pastel (Pink/Coquette) para la interfaz */
       body {
         font-family: 'Segoe UI', sans-serif;
         text-align: center;
@@ -126,9 +127,11 @@
     </div>
 
     <button onclick="resetGame()">Reiniciar Juego 💕</button>
-
     <script>
       let model = null;
+      
+      // Defino el estado del tablero lineal de 9 casillas idéntico al del libro:
+      // 0 = casilla vacía, 1 = Yo (Humano), -1 = La IA
       let boardState = [0, 0, 0, 0, 0, 0, 0, 0, 0];
       let gameActive = false;
 
@@ -136,18 +139,22 @@
       const cells = document.querySelectorAll('.cell');
       const difficultySelect = document.getElementById('difficulty');
 
+      // Almaceno aquí las combinaciones ganadoras tradicionales para comprobar el fin del juego
       const winPatterns = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],
-        [0, 4, 8], [2, 4, 6]
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], // Horizontales
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], // Verticales
+        [0, 4, 8], [2, 4, 6]              // Diagonales
       ];
 
+      // Verifico que TensorFlow esté listo e inicializo la carga del modelo local
       tf.ready().then(() => {
+        // Apunto a la ruta donde guardamos el JSON del modelo entrenado
         const modelPath = 'model/ttt_model.json';
         
+        // Uso tf.tidy() para limpiar automáticamente la memoria gráfica (WebGL) tras cargar el modelo
         tf.tidy(() => {
           tf.loadLayersModel(modelPath).then((loadedModel) => {
-            model = loadedModel;
+            model = loadedModel; // Guardo el modelo en mi variable global
             statusDiv.innerText = "✨ ¡Tu turno! Juegas con 'X' ✨";
             gameActive = true;
             setupEventListeners();
@@ -158,18 +165,22 @@
         });
       });
 
+      // Escucho los eventos de click en cada una de las celdas del tablero
       function setupEventListeners() {
         cells.forEach(cell => {
           cell.addEventListener('click', (e) => {
             const index = parseInt(e.target.getAttribute('data-index'));
             
+            // Si la casilla está vacía (0) y el juego está activo, proceso mi jugada humana
             if (boardState[index] === 0 && gameActive) {
-              makeMove(index, 1, 'X', 'x-player');
+              makeMove(index, 1, 'X', 'x-player'); // Registro mi jugada como un '1'
               
+              // Si con mi tiro no termina la partida, bloqueo la pantalla y le doy el turno a la IA
               if (!checkGameOver(boardState, true)) {
                 statusDiv.innerText = "🧠 Pensando la IA...";
                 gameActive = false; 
                 
+                // Agrego un pequeño retraso de 400ms para simular procesamiento
                 setTimeout(() => {
                   aiTurn();
                 }, 400);
@@ -179,32 +190,44 @@
         });
       }
 
+      // Con esta función pinto la interfaz visual y actualizo el estado lógico del arreglo matemático
       function makeMove(index, playerValue, symbol, cssClass) {
         boardState[index] = playerValue;
         cells[index].innerText = symbol;
         cells[index].classList.add('taken', cssClass);
       }
 
+      // Evalúo el selector de la interfaz para saber qué lógica aplicar en el turno de la IA
       function aiTurn() {
         const difficulty = difficultySelect.value;
         if (difficulty === 'easy') {
-          aiMoveBookModel();
+          aiMoveBookModel(); // Uso el modelo de redes neuronales básico del libro
         } else {
-          aiMoveImpossible();
+          aiMoveImpossible(); // Uso el algoritmo de búsqueda Minimax imbatible
         }
       }
 
+      // MODO FÁCIL: Aquí aplico estrictamente el método matemático del Chapter 5 del libro
       function aiMoveBookModel() {
+        // Encapsulo en tf.tidy() para que TensorFlow destruya los tensores intermedios y no congele el navegador
         tf.tidy(() => {
+          // Convierto mi arreglo de JS en un Tensor de dos dimensiones apto para el modelo
           const inputTensor = tf.tensor2d([boardState], [1, 9]);
+          
+          // Ejecuto la predicción de la red neuronal pasando el estado actual
           const prediction = model.predict(inputTensor);
+          
+          // Saco los valores numéricos del tensor de vuelta a un formato plano ejecutable en JS
           const probabilities = prediction.dataSync();
 
           let bestMove = -1;
           let highestProb = -Infinity;
 
+          // Recorro las casillas buscando la opción ideal bajo la regla del libro:
+          // Evalúo únicamente las casillas que lógicamente valen cero (vacias)
           for (let i = 0; i < 9; i++) {
             if (boardState[i] === 0) {
+              // Elijo el índice que contenga la probabilidad de peso más alta
               if (probabilities[i] > highestProb) {
                 highestProb = probabilities[i];
                 bestMove = i;
@@ -212,10 +235,12 @@
             }
           }
 
+          // Si el modelo decide una casilla legal, ejecuto el tiro asignándole el valor de -1
           if (bestMove !== -1) {
             makeMove(bestMove, -1, 'O', 'o-player');
           }
           
+          // Si la máquina no provoca fin de juego, me devuelve el control
           if (!checkGameOver(boardState, true)) {
             statusDiv.innerText = "✨ Tu turno. Juegas con 'X' ✨";
             gameActive = true;
@@ -223,15 +248,19 @@
         });
       }
 
+      // MODO IMBATIBLE: Aquí implemento un árbol de decisiones mediante Minimax para prevenir fallas
       function aiMoveImpossible() {
         let bestScore = -Infinity;
         let move = -1;
         
+        // Exploro recursivamente cada casilla vacía del tablero simulando las consecuencias
         for (let i = 0; i < 9; i++) {
           if (boardState[i] === 0) {
-            boardState[i] = -1;
-            let score = minimax(boardState, 0, false);
-            boardState[i] = 0;
+            boardState[i] = -1; // Simulo que la IA tira aquí
+            let score = minimax(boardState, 0, false); // Calculo el puntaje resultante
+            boardState[i] = 0; // Deshago la simulación para no alterar el tablero real
+            
+            // Me quedo con el movimiento que maximice mis opciones de victoria
             if (score > bestScore) {
               bestScore = score;
               move = i;
@@ -249,9 +278,10 @@
         }
       }
 
+      // Este es el motor recursivo que puntúa el árbol de juego (Maximiza IA, Minimiza Humano)
       function minimax(state, depth, isMaximizing) {
         let result = evaluateBoard(state);
-        if (result !== null) return result;
+        if (result !== null) return result; // Si el estado es terminal, devuelvo su puntuación base
 
         if (isMaximizing) {
           let bestScore = -Infinity;
@@ -278,6 +308,7 @@
         }
       }
 
+      // Asigno pesos matemáticos rápidos para el Minimax: +10 si gana la máquina, -10 si gano yo, 0 empate
       function evaluateBoard(state) {
         for (let pattern of winPatterns) {
           const [a, b, c] = pattern;
@@ -289,11 +320,13 @@
         return null;
       }
 
+      // Verifico de forma global si se cumple algún patrón de victoria o si nos quedamos sin casillas libres (Empate)
       function checkGameOver(state, updateUI) {
         for (let pattern of winPatterns) {
           const [a, b, c] = pattern;
           if (state[a] !== 0 && state[a] === state[b] && state[a] === state[c]) {
             if (updateUI) {
+              // Imprimo el resultado directo en el contenedor de estado y detengo la partida
               statusDiv.innerText = state[a] === 1 ? "👑 ¡Ganaste tú! 🎉" : "🤖 ¡Ganó la IA! 💔";
               gameActive = false;
             }
@@ -301,6 +334,7 @@
           }
         }
 
+        // Si ya no hay ningún cero, declaro el empate técnico
         if (!state.includes(0)) {
           if (updateUI) {
             statusDiv.innerText = "🎀 ¡Empate! 🤝";
@@ -312,6 +346,7 @@
         return false;
       }
 
+      // Limpio por completo el array lógico, restauro las clases de estilo CSS y devuelvo el juego al estado inicial
       function resetGame() {
         boardState = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         cells.forEach(cell => {
